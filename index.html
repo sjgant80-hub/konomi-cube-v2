@@ -1,0 +1,1333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0a0f">
+<title>紙 konomi-cube · v2 · the fold engine</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"konomi-cube-v2","short_name":"konomi-cube","start_url":"./","display":"standalone","background_color":"%230b0a0f","theme_color":"%23ff8c00","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 192 192%27><rect width=%27192%27 height=%27192%27 fill=%27%230b0a0f%27 rx=%2828%27/><text x=%2796%27 y=%27130%27 font-family=%27Georgia, serif%27 font-size=%27108%27 font-weight=%27700%27 text-anchor=%27middle%27 fill=%27%23ff8c00%27>◊</text></svg>","sizes":"192x192","type":"image/svg+xml"}]}'>
+<script type="importmap">
+{"imports":{
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<style>
+:root{
+  --void:#0b0a0f; --void-2:#13121a; --ink:#1a1922; --ink-2:#22212c;
+  --line:#2a2934; --line-soft:#1f1e28;
+  --cream:#e6e1d6; --cream-dim:#a8a395; --cream-muted:#6e6a5e;
+  --brass:#b8974a; --amber:#ff8c00; --ox:#8b1a1a;
+  --green:#4ade80; --red:#ef4444; --blue:#60a5fa; --yellow:#fbbf24;
+  --serif:Georgia,'Libre Baskerville',ui-serif,serif;
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'IBM Plex Mono','SF Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--void);color:var(--cream);font-family:var(--sans);font-size:13px;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit;background:var(--ink);border:1px solid var(--line);border-radius:4px;padding:6px 8px;outline:none}
+input:focus,textarea:focus{border-color:var(--brass)}
+
+#app{display:grid;grid-template-rows:48px 1fr;height:100vh;width:100vw}
+
+/* header */
+header{display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--void-2);border-bottom:1px solid var(--line);min-height:48px}
+.mark{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:6px;background:linear-gradient(135deg,var(--brass),var(--amber));color:var(--void);font-family:var(--serif);font-size:18px;font-weight:700;line-height:1}
+.brand{display:flex;flex-direction:column;line-height:1.1}
+.brand .ti{font-family:var(--serif);font-size:15px;color:var(--cream);letter-spacing:.4px}
+.brand .ti b{color:var(--brass);font-weight:700;font-style:italic;margin-right:2px}
+.brand .su{font-family:var(--mono);font-size:10px;color:var(--cream-muted);margin-top:1px}
+.seal{margin-left:auto;display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;color:var(--cream-dim)}
+.seal .pill{padding:3px 8px;border:1px solid var(--line);border-radius:99px;background:var(--ink)}
+.seal .pill.live{color:var(--green);border-color:#1e3a26}
+.seal .pill.brass{color:var(--brass);border-color:#3a2f15}
+.seal #tierBadge.t3{color:var(--amber)}
+
+/* workspace grid */
+#ws{display:grid;grid-template-columns:200px 1fr 260px;height:calc(100vh - 48px);min-height:0}
+.pane{background:var(--void-2);border-right:1px solid var(--line);overflow:auto;display:flex;flex-direction:column;min-height:0}
+.pane.right{border-right:0;border-left:1px solid var(--line)}
+.section{padding:10px 12px;border-bottom:1px solid var(--line-soft)}
+.section h3{font-family:var(--serif);font-size:11px;font-weight:600;color:var(--brass);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px}
+.section .hint{color:var(--cream-muted);font-size:10.5px;font-family:var(--mono);margin-top:6px;line-height:1.5}
+
+/* glyph palette */
+.gpal{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.gbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;background:var(--ink);border:1px solid var(--line);border-radius:6px;transition:all .12s;min-height:60px;gap:2px}
+.gbtn:hover{border-color:var(--brass);background:var(--ink-2);transform:translateY(-1px)}
+.gbtn .g{font-family:var(--serif);font-size:22px;line-height:1;color:var(--cream)}
+.gbtn .nm{font-family:var(--mono);font-size:9px;color:var(--cream-dim);letter-spacing:.3px}
+.gbtn .pr{font-family:var(--mono);font-size:8px;color:var(--cream-muted)}
+.gbtn.mut .g{color:var(--amber)}
+.gbtn.flash{background:var(--amber);color:var(--void);border-color:var(--amber)}
+.gbtn.flash .g, .gbtn.flash .nm, .gbtn.flash .pr{color:var(--void)}
+.gbtn .kbd{position:absolute;top:2px;right:3px;font-family:var(--mono);font-size:8px;color:var(--cream-muted);opacity:.7}
+.gbtn{position:relative}
+
+/* center stage */
+.stage{position:relative;background:#0b0a0f;display:flex;flex-direction:column;min-height:0}
+.seqbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(19,18,26,.85);border-bottom:1px solid var(--line);backdrop-filter:blur(6px);z-index:10}
+.seqbar input{flex:1;font-family:var(--serif);font-size:18px;padding:8px 10px;letter-spacing:2px}
+.seqbar button{background:var(--brass);color:var(--void);padding:8px 14px;border-radius:4px;font-weight:600;font-family:var(--mono);font-size:11px;letter-spacing:.5px}
+.seqbar button:hover{background:var(--amber)}
+.seqbar button.ghost{background:var(--ink);color:var(--cream-dim);border:1px solid var(--line)}
+.seqbar button.ghost:hover{color:var(--cream);border-color:var(--brass)}
+
+#canvasWrap{flex:1;position:relative;min-height:0}
+canvas{display:block}
+
+.hud{position:absolute;top:12px;left:12px;background:rgba(11,10,15,.75);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:10.5px;color:var(--cream-dim);backdrop-filter:blur(8px);max-width:280px;line-height:1.55}
+.hud .row{display:flex;justify-content:space-between;gap:14px}
+.hud .row b{color:var(--brass);font-weight:600}
+.hud .fnum{color:var(--amber);font-weight:600}
+.hud .vec{color:var(--cream);font-size:10px}
+
+.scrub{padding:8px 12px;background:rgba(19,18,26,.85);border-top:1px solid var(--line);backdrop-filter:blur(6px);display:flex;align-items:center;gap:6px;overflow-x:auto;min-height:42px}
+.scrub .lbl{font-family:var(--mono);font-size:9.5px;color:var(--cream-muted);letter-spacing:.5px;flex-shrink:0;margin-right:6px}
+.scrub .stp{font-family:var(--serif);font-size:14px;color:var(--cream);padding:4px 6px;background:var(--ink);border:1px solid var(--line);border-radius:4px;cursor:pointer;flex-shrink:0;min-width:24px;text-align:center}
+.scrub .stp:hover{border-color:var(--brass)}
+.scrub .stp.cur{background:var(--brass);color:var(--void);border-color:var(--brass)}
+
+/* right panel */
+.nfbtn,.actbtn{display:flex;justify-content:space-between;align-items:center;width:100%;padding:7px 9px;background:var(--ink);border:1px solid var(--line);border-radius:4px;margin-bottom:5px;font-family:var(--mono);font-size:10.5px;text-align:left;color:var(--cream-dim);transition:all .12s}
+.nfbtn:hover,.actbtn:hover{border-color:var(--brass);color:var(--cream);background:var(--ink-2)}
+.nfbtn .g{font-family:var(--serif);color:var(--brass);font-size:12px;letter-spacing:1px}
+.actbtn.primary{background:var(--ox);color:var(--cream);border-color:#5a1010}
+.actbtn.primary:hover{background:#a82020;color:#fff}
+.actbtn.brass{background:var(--brass);color:var(--void);border-color:var(--brass);font-weight:600}
+.actbtn.brass:hover{background:var(--amber)}
+
+.kapbar{height:6px;background:var(--ink);border-radius:3px;overflow:hidden;margin-top:4px}
+.kapbar i{display:block;height:100%;background:linear-gradient(90deg,var(--ox),var(--brass),var(--amber),var(--green));width:50%;transition:width .15s}
+
+input[type=number]{width:100%}
+
+/* shield notification */
+.shield{position:absolute;left:50%;top:60px;transform:translateX(-50%);background:var(--void);border:2px solid var(--ox);border-radius:8px;padding:18px 26px;box-shadow:0 0 40px rgba(184,151,74,.4),0 0 0 1px var(--brass) inset;z-index:99;font-family:var(--serif);text-align:center;max-width:420px;display:none}
+.shield.show{display:block;animation:shieldIn .5s ease-out}
+@keyframes shieldIn{from{opacity:0;transform:translate(-50%,-20px) scale(.9)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+.shield .sym{font-size:38px;color:var(--brass);line-height:1;margin-bottom:8px}
+.shield .ti{font-size:15px;color:var(--cream);margin-bottom:4px}
+.shield .sub{font-family:var(--mono);font-size:10px;color:var(--cream-muted);margin-bottom:10px;letter-spacing:.5px}
+.shield .x{background:var(--ink);color:var(--cream-dim);padding:5px 12px;border-radius:99px;font-family:var(--mono);font-size:10px;border:1px solid var(--line)}
+.shield .x:hover{color:var(--cream);border-color:var(--brass)}
+
+/* palette modal (Ω) */
+.palette-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:none;align-items:flex-start;justify-content:center;padding-top:120px;z-index:200}
+.palette-bg.on{display:flex}
+.palette{width:min(580px,90vw);background:var(--void-2);border:1px solid var(--brass);border-radius:8px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.8)}
+.palette-hd{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.palette-hd .glyph{font-family:var(--serif);font-size:20px;color:var(--brass)}
+.palette-hd input{flex:1;background:transparent;border:0;font-size:15px;padding:4px 0}
+.palette-hd .badge{font-family:var(--mono);font-size:9px;padding:3px 7px;border:1px solid var(--line);border-radius:99px;color:var(--cream-muted)}
+.palette-bd{padding:8px;max-height:300px;overflow-y:auto;font-family:var(--mono);font-size:11px;color:var(--cream-dim);line-height:1.6}
+.palette-bd .pitem{padding:6px 8px;border-radius:4px;cursor:pointer}
+.palette-bd .pitem:hover{background:var(--ink)}
+.palette-bd .pitem b{color:var(--brass)}
+
+/* settings modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:201}
+.modal-bg.on{display:flex}
+.modal{width:min(440px,90vw);background:var(--void-2);border:1px solid var(--brass);border-radius:8px;padding:18px}
+.modal h2{font-family:var(--serif);font-size:16px;color:var(--brass);margin-bottom:12px}
+.modal label{display:block;font-family:var(--mono);font-size:10.5px;color:var(--cream-dim);margin:8px 0 3px}
+.modal input{width:100%}
+.modal .row{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+
+/* toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--ink);border:1px solid var(--brass);border-radius:6px;padding:10px 14px;font-family:var(--mono);font-size:11px;color:var(--cream);z-index:300;box-shadow:0 6px 20px rgba(0,0,0,.6);max-width:340px;opacity:0;transform:translateY(8px);transition:all .25s}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* mobile */
+@media(max-width:760px){
+  #ws{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
+  .pane,.pane.right{border-right:0;border-left:0;border-bottom:1px solid var(--line);max-height:38vh}
+  .seqbar input{font-size:15px}
+  header{padding:0 10px;gap:8px}
+  .brand .su{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span class="mark">◊</span>
+    <div class="brand">
+      <span class="ti"><b>紙</b> konomi-cube · v2</span>
+      <span class="su">the fold engine · v20.4 socket VI made visible</span>
+    </div>
+    <div class="seal">
+      <span class="pill brass">prime 691</span>
+      <span class="pill">F=<span id="hF">1</span></span>
+      <span class="pill">φ=<span id="hPhi">1.00</span></span>
+      <span class="pill">κ=<span id="hKap">0.25</span></span>
+      <span class="pill live" id="tierBadge">offline</span>
+      <button class="pill" id="omegaBtn" title="Ω · Ctrl+K">Ω</button>
+      <button class="pill" id="setBtn" title="settings">⚙</button>
+    </div>
+  </header>
+
+  <div id="ws">
+    <!-- LEFT: glyph palette -->
+    <div class="pane">
+      <div class="section">
+        <h3>fold operators · 7 base</h3>
+        <div class="gpal" id="basePal"></div>
+        <div class="hint">click to append · keys 1–7</div>
+      </div>
+      <div class="section">
+        <h3>mutations · 6 modifiers</h3>
+        <div class="gpal" id="mutPal"></div>
+        <div class="hint">keys q w e r t y</div>
+      </div>
+      <div class="section">
+        <h3>algebra</h3>
+        <div class="hint">●(S) idempotent on non-empty<br>華 ∘ G = ● (undo last)<br>響 ∘ G = G ∘ G (echo)<br>雷 forces θ = π<br>127 → ◊ the shield</div>
+      </div>
+    </div>
+
+    <!-- CENTER: stage -->
+    <div class="stage">
+      <div class="seqbar">
+        <input id="seqInput" placeholder="●〜┃♡△◐◯ — type or paste a fold sequence" autocomplete="off" spellcheck="false">
+        <button id="foldBtn" title="apply sequence · Space">Fold</button>
+        <button class="ghost" id="resetBtn" title="reset · Esc">Reset</button>
+      </div>
+      <div id="canvasWrap">
+        <div class="hud" id="hud">
+          <div class="row"><b>state S</b><span class="vec" id="hS">[0,0,0,0,0,0,0]</span></div>
+          <div class="row"><b>fold F(S)</b><span class="fnum" id="hFnum">1</span></div>
+          <div class="row"><b>factorisation</b><span id="hFac">1</span></div>
+          <div class="row"><b>history</b><span id="hHist">0 steps</span></div>
+          <div class="row"><b>φ-coherence</b><span id="hPhi2">1.000</span></div>
+          <div class="row"><b>κ (audio)</b><span id="hKap2">0.250</span></div>
+          <div class="kapbar"><i id="hKapBar"></i></div>
+        </div>
+        <div class="shield" id="shield">
+          <div class="sym">◊</div>
+          <div class="ti" id="shieldTi">127 has no fold</div>
+          <div class="sub">the shield holds · §18 geometric proof</div>
+          <button class="x" id="shieldX">dismiss</button>
+        </div>
+      </div>
+      <div class="scrub" id="scrub">
+        <span class="lbl">history</span>
+        <span class="stp cur" data-i="-1" title="base plane">◯</span>
+      </div>
+    </div>
+
+    <!-- RIGHT: forms, number, audio, export -->
+    <div class="pane right">
+      <div class="section">
+        <h3>named forms</h3>
+        <div id="namedList"></div>
+      </div>
+      <div class="section">
+        <h3>number → fold</h3>
+        <input type="number" id="numInput" placeholder="42, 510510, 127…" min="1" step="1">
+        <div class="hint">42 → ●〜♡ · 510510 → primorial · 127 → ◊ shield</div>
+      </div>
+      <div class="section">
+        <h3>audio reactivity</h3>
+        <button class="actbtn" id="micBtn">🎤 enable mic</button>
+        <div class="hint">bass → coherent · treble → chaotic<br>modulates next fold's angle via κ</div>
+      </div>
+      <div class="section">
+        <h3>export</h3>
+        <button class="actbtn brass" id="expGlb">⬇ download .glb mesh</button>
+        <button class="actbtn" id="expJson">⬇ download .json state</button>
+        <div class="hint">Ctrl+E for .glb</div>
+      </div>
+      <div class="section">
+        <h3>keyboard</h3>
+        <div class="hint">1-7 base · q w e r t y mut<br>Space apply · Esc reset · Ctrl+E export<br>Ctrl+K palette</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ω palette -->
+<div class="palette-bg" id="palette">
+  <div class="palette">
+    <div class="palette-hd">
+      <span class="glyph">Ω</span>
+      <input id="pInput" placeholder="fold 42 · load crane · export · reset · …">
+      <span class="badge" id="pTier">T0</span>
+    </div>
+    <div class="palette-bd" id="pBody"></div>
+  </div>
+</div>
+
+<!-- settings -->
+<div class="modal-bg" id="setModal">
+  <div class="modal">
+    <h2>settings · konomi-cube</h2>
+    <label>Anthropic API key (optional · for Ω parser)</label>
+    <input id="setAnth" type="password" placeholder="sk-ant-…">
+    <label>OpenAI API key (optional)</label>
+    <input id="setOAI" type="password" placeholder="sk-…">
+    <label>Gemini API key (optional)</label>
+    <input id="setGem" type="password" placeholder="…">
+    <label>OpenRouter API key (optional)</label>
+    <input id="setOR" type="password" placeholder="sk-or-…">
+    <div class="row">
+      <button class="actbtn" id="setCancel" style="width:auto">cancel</button>
+      <button class="actbtn brass" id="setSave" style="width:auto">save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+// ════════════════════════════════════════════════════════════════
+// konomigami-lib · inlined verbatim · the fold algebra
+// ◊·κ=1 · v20.4 socket VI · prime 677 · MIT
+// ════════════════════════════════════════════════════════════════
+const konomigami = (() => {
+  const VERSION = '1.0.0';
+  const PRIME = 677;
+  const PHI = (1 + Math.sqrt(5)) / 2;
+  const KAPPA = 1 / PHI;
+  const SPINE = [2, 3, 5, 7, 11, 13, 17];
+  const FOLD = 510510;
+  const THETA_DEFAULT = Math.PI / PHI;
+  const GOLDEN_ANGLE_DEG = 360 / (PHI * PHI);
+  const BREAK_POINT = 127;
+  const GLYPHS = ['●','〜','┃','♡','△','◐','◯'];
+  const GLYPH_NAMES = ['GROUND','WAVE','GATE','SINK','REVERSE','PETAL','COLLAPSE'];
+  const ISA95 = ['L0-physical','L1-sensing','L2-control','L3-operations','L4-business','L5-enterprise','L6-observer'];
+  const MUTATIONS = ['火','水','空','雷','響','華'];
+  const MUTATION_NAMES = ['FIRE','WATER','SKY','THUNDER','ECHO','BLOOM'];
+  const NAMED_FORMS = {
+    primorial: '●〜┃♡△◐◯',
+    crane:     '〜┃〜┃♡△◐',
+    mersenne:  '◯◯◯◯◯◯◯',
+    fibonacci: '〜〜┃┃┃♡♡♡♡♡△△△△△△△△◐◐◐◐◐◐◐◐◐◐◐◐◐◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯',
+    shield:    Array(18).fill('●〜┃♡△◐◯').join(''),
+    unfolded:  '●',
+  };
+  const emptyState = () => [0,0,0,0,0,0,0];
+  const inc = (s,i) => { const x=s.slice(); x[i]=(x[i]||0)+1; return x; };
+  const foldNumber = (s) => { let n=1; for(let i=0;i<SPINE.length;i++) n*=Math.pow(SPINE[i],s[i]||0); return n; };
+  const bloomVector = (n) => {
+    const S=emptyState(); let rem=Math.floor(Math.abs(n)); if(rem<1) return S;
+    for(let i=0;i<SPINE.length;i++){ while(rem%SPINE[i]===0){ S[i]++; rem/=SPINE[i]; } }
+    return rem===1 ? S : null;
+  };
+  const numberToSequence = (n) => {
+    const S=bloomVector(n); if(S===null) return '';
+    let out=''; for(let i=0;i<SPINE.length;i++) out+=GLYPHS[i].repeat(S[i]||0);
+    return out;
+  };
+  const sequenceToNumber = (seq) => {
+    const S=emptyState();
+    for(const ch of seq){ const i=GLYPHS.indexOf(ch); if(i>=0) S[i]++; }
+    return foldNumber(S);
+  };
+  const isFoldable = (n) => bloomVector(n) !== null;
+  const defaultAdapter = () => ({
+    basePlane: () => ({ kind:'plane', folded:[] }),
+    foldAlongAxis: (m,a) => ({...m, folded:[...m.folded,{type:'axis',angle:a}]}),
+    sinkVertex:    (m,a) => ({...m, folded:[...m.folded,{type:'sink',angle:a}]}),
+    reverseFold:   (m)   => ({...m, folded:[...m.folded,{type:'reverse'}]}),
+    petalFold:     (m)   => ({...m, folded:[...m.folded,{type:'petal'}]}),
+    waterbomb:     (m)   => ({...m, folded:[...m.folded,{type:'waterbomb'}]}),
+    identity:      (m)   => m,
+  });
+  function theta(ctx){
+    if(ctx.snapNext){ ctx.snapNext=false; return Math.PI; }
+    const base=THETA_DEFAULT; const mul=ctx.thetaMul||1; ctx.thetaMul=1;
+    return base*mul;
+  }
+  const FOLD_OPS = {
+    '●':(S,M,ctx)=>{ const a=ctx.adapter||defaultAdapter(); if(S.every(e=>e===0)) return {S:inc(S,0),M:a.basePlane(),angle:0}; return {S,M,angle:0}; },
+    '〜':(S,M,ctx)=>{ const a=ctx.adapter||defaultAdapter(); const ang=-theta(ctx); return {S:inc(S,1),M:a.foldAlongAxis(M,ang),angle:ang}; },
+    '┃':(S,M,ctx)=>{ const a=ctx.adapter||defaultAdapter(); const ang=+theta(ctx); return {S:inc(S,2),M:a.foldAlongAxis(M,ang),angle:ang}; },
+    '♡':(S,M,ctx)=>{ const a=ctx.adapter||defaultAdapter(); const ang=theta(ctx); return {S:inc(S,3),M:a.sinkVertex(M,ang),angle:ang}; },
+    '△':(S,M,ctx)=>{ const a=ctx.adapter||defaultAdapter(); return {S:inc(S,4),M:a.reverseFold(M),angle:-theta(ctx)}; },
+    '◐':(S,M,ctx)=>{ const a=ctx.adapter||defaultAdapter(); return {S:inc(S,5),M:a.petalFold(M),angle:theta(ctx)}; },
+    '◯':(S,M,ctx)=>{ const a=ctx.adapter||defaultAdapter(); return {S:inc(S,6),M:a.waterbomb(M),angle:Math.PI}; },
+  };
+  const MUTATION_OPS = {
+    '火':(ctx)=>({...ctx, thetaMul:(ctx.thetaMul||1)*2}),
+    '水':(ctx)=>({...ctx, thetaMul:(ctx.thetaMul||1)*0.5}),
+    '空':(ctx)=>({...ctx, skipNext:true}),
+    '雷':(ctx)=>({...ctx, snapNext:true}),
+    '響':(ctx)=>({...ctx, echoNow:true}),
+    '華':(ctx)=>({...ctx, bloomNow:true}),
+  };
+  function apply(sequence, options={}){
+    let state = options.state ? options.state.slice() : emptyState();
+    const ctx = { adapter: options.adapter || defaultAdapter(), thetaMul:1, snapNext:false, echoNext:false, bloomNext:false, skipNext:false };
+    let mesh = options.mesh || ctx.adapter.basePlane();
+    const history = []; let lastBaseGlyph=null; let lastState=null;
+    const chars = Array.from(sequence);
+    for(const g of chars){
+      if(MUTATION_OPS[g]){
+        Object.assign(ctx, MUTATION_OPS[g](ctx));
+        if(ctx.bloomNow){
+          ctx.bloomNow=false;
+          if(lastState!==null && history.length){
+            state=lastState.slice();
+            if(mesh && mesh.folded && mesh.folded.length) mesh={...mesh, folded:mesh.folded.slice(0,-1)};
+            history.push({glyph:'華', state:state.slice(), angle:null});
+          }
+        }
+        if(ctx.echoNow){
+          ctx.echoNow=false;
+          if(lastBaseGlyph){
+            const op=FOLD_OPS[lastBaseGlyph];
+            if(op){ const before=state.slice(); const r=op(state,mesh,ctx); lastState=before; state=r.S; mesh=r.M; history.push({glyph:'響', state:state.slice(), angle:r.angle, echoed:lastBaseGlyph}); }
+          }
+        }
+        continue;
+      }
+      if(ctx.skipNext){ ctx.skipNext=false; continue; }
+      const op=FOLD_OPS[g]; if(!op) continue;
+      const before=state.slice();
+      const r=op(state,mesh,ctx);
+      lastState=before; state=r.S; mesh=r.M; lastBaseGlyph=g;
+      history.push({glyph:g, state:state.slice(), angle:r.angle});
+      if(options.onStep) options.onStep({glyph:g, state, mesh, angle:r.angle, index:history.length-1});
+    }
+    return { state, mesh, foldNumber:foldNumber(state), history };
+  }
+  function phiCoherence(angles){
+    if(!Array.isArray(angles) || angles.length<2) return 1;
+    let sum=0,n=0;
+    for(let i=1;i<angles.length;i++){
+      const a=Math.abs(angles[i-1]); const b=Math.abs(angles[i]);
+      if(a<1e-9) continue;
+      const ratio=b/a; const sc=Math.max(0,Math.min(1,1-Math.abs(ratio-PHI)));
+      sum+=sc; n++;
+    }
+    return n ? sum/n : 1;
+  }
+  function kappa({bass=0, high=0}={}){ return bass*1.6 - high*0.7 + 0.25; }
+  function audioModulatedAngle(baseAngle, k){
+    if(k>1.0) return baseAngle;
+    if(k<0.5) return baseAngle*(1+Math.random()*0.5);
+    return baseAngle*(0.8+k*0.4);
+  }
+  return { VERSION, PRIME, PHI, KAPPA, SPINE, FOLD, THETA_DEFAULT, GOLDEN_ANGLE_DEG, BREAK_POINT,
+    GLYPHS, GLYPH_NAMES, ISA95, MUTATIONS, MUTATION_NAMES, NAMED_FORMS,
+    emptyState, inc, foldNumber, bloomVector, sequenceToNumber, numberToSequence, isFoldable,
+    FOLD_OPS, MUTATION_OPS, apply, phiCoherence, kappa, audioModulatedAngle };
+})();
+window.konomigami = konomigami;
+
+const { GLYPHS, GLYPH_NAMES, ISA95, MUTATIONS, MUTATION_NAMES, NAMED_FORMS, SPINE,
+  THETA_DEFAULT, PHI, apply, numberToSequence, bloomVector, foldNumber, isFoldable,
+  phiCoherence, kappa, audioModulatedAngle } = konomigami;
+
+// ════════════════════════════════════════════════════════════════
+// state · konomi-cube v2 application
+// ════════════════════════════════════════════════════════════════
+const TOOLNAME = 'konomi-cube-v2';
+const PRIME = 691;
+const VERSION = '2.0.0';
+
+const state = {
+  sequence: '',
+  history: [],          // [{glyph, angle, kind, params}]
+  S: konomigami.emptyState(),
+  kappa: 0.25,
+  audio: null,
+  settings: {},
+  applying: false,
+};
+
+try{ state.settings = JSON.parse(localStorage.getItem('kcv2_settings')||'{}'); }catch(e){}
+
+// ════════════════════════════════════════════════════════════════
+// Three.js scene
+// ════════════════════════════════════════════════════════════════
+const canvasWrap = document.getElementById('canvasWrap');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0a0f);
+scene.fog = new THREE.Fog(0x0b0a0f, 6, 14);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+camera.position.set(3.2, 2.6, 3.2);
+camera.lookAt(0,0,0);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+canvasWrap.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 1.5;
+controls.maxDistance = 9;
+
+// lights
+scene.add(new THREE.AmbientLight(0x1a1922, 1.4));
+const dir = new THREE.DirectionalLight(0xfff0d8, 1.4);
+dir.position.set(4, 6, 3);
+scene.add(dir);
+const rim = new THREE.DirectionalLight(0xff8c00, 0.5);
+rim.position.set(-4, 2, -3);
+scene.add(rim);
+const fill = new THREE.DirectionalLight(0xb8974a, 0.35);
+fill.position.set(0, -3, 2);
+scene.add(fill);
+
+// grid floor (subtle)
+const grid = new THREE.GridHelper(8, 16, 0x2a2934, 0x1a1922);
+grid.position.y = -1.5;
+scene.add(grid);
+
+// origin marker
+const axOrigin = new THREE.AxesHelper(0.3);
+axOrigin.material.opacity = 0.3;
+axOrigin.material.transparent = true;
+scene.add(axOrigin);
+
+// the paper mesh
+const SEG = 32;
+const SIZE = 2;
+function makePlaneGeometry(){
+  const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+  geo.rotateX(-Math.PI/2);
+  return geo;
+}
+const baseMat = new THREE.MeshStandardMaterial({
+  color: 0xb8974a, side: THREE.DoubleSide, roughness: 0.55, metalness: 0.35,
+  emissive: 0x3a2d12, emissiveIntensity: 0.4, flatShading: false,
+});
+const wireMat = new THREE.LineBasicMaterial({ color: 0xff8c00, transparent:true, opacity:0.18 });
+
+let paperGeo = makePlaneGeometry();
+const paperMesh = new THREE.Mesh(paperGeo, baseMat);
+scene.add(paperMesh);
+const wire = new THREE.LineSegments(new THREE.WireframeGeometry(paperGeo), wireMat);
+scene.add(wire);
+
+// snapshot of base positions (for ground reset and re-applying transforms from scratch)
+let basePositions = paperGeo.attributes.position.array.slice();
+
+// ────────────────────────────────────────────────────────────────
+// fold step records · used to rebuild mesh deterministically
+// state.history holds raw transform records (not glyph history) so
+// scrubber rewind is just "apply records [0..i]" against base positions
+// ────────────────────────────────────────────────────────────────
+// each record: { kind, params } — kind ∈ ground|axis|sink|reverse|petal|waterbomb
+// axis params: { axis: 'x'|'z', side: +1|-1, angle, line: 0 }
+// sink params: { angle, vertexIndex }
+// petal params: { quadrant: 0..3, angle }
+// waterbomb params: { factor }
+
+// helper: rebuild current geometry from records 0..n applied to baseline
+function rebuildFrom(records, animTo=null){
+  const arr = paperGeo.attributes.position.array;
+  // start from base
+  for(let i=0;i<arr.length;i++) arr[i] = basePositions[i];
+  // apply each record fully (except possibly the animTo target which we animate elsewhere)
+  for(let i=0; i<records.length; i++){
+    const r = records[i];
+    applyRecordToBuffer(arr, r, 1.0);
+  }
+  paperGeo.attributes.position.needsUpdate = true;
+  paperGeo.computeVertexNormals();
+  wire.geometry.dispose();
+  wire.geometry = new THREE.WireframeGeometry(paperGeo);
+}
+
+// apply ONE record to a flat Float32-like array, at progress t (0..1)
+function applyRecordToBuffer(arr, rec, t){
+  const v = new THREE.Vector3();
+  switch(rec.kind){
+    case 'ground':
+      // pull all vertices a fraction toward base position
+      for(let i=0;i<arr.length;i+=3){
+        arr[i]   = arr[i]   + (basePositions[i]   - arr[i])   * t;
+        arr[i+1] = arr[i+1] + (basePositions[i+1] - arr[i+1]) * t;
+        arr[i+2] = arr[i+2] + (basePositions[i+2] - arr[i+2]) * t;
+      }
+      break;
+    case 'axis': {
+      // rotate vertices on one side of crease axis by angle * t
+      const ang = rec.params.angle * t;
+      const ax = rec.params.axis;  // 'x' or 'z'
+      const side = rec.params.side;
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      for(let i=0;i<arr.length;i+=3){
+        const x = arr[i], y = arr[i+1], z = arr[i+2];
+        let coord = (ax==='x') ? z : x;
+        if(coord*side > 0){
+          if(ax==='x'){
+            // rotate around x-axis: y,z change
+            const ny = ca*y - sa*z;
+            const nz = sa*y + ca*z;
+            arr[i+1] = ny; arr[i+2] = nz;
+          } else {
+            // rotate around z-axis: x,y change
+            const nx = ca*x - sa*y;
+            const ny = sa*x + ca*y;
+            arr[i] = nx; arr[i+1] = ny;
+          }
+        }
+      }
+      break;
+    }
+    case 'sink': {
+      // push a vertex region inward along normal
+      const cx = rec.params.cx, cz = rec.params.cz;
+      const depth = rec.params.depth * t;
+      const radius = rec.params.radius;
+      for(let i=0;i<arr.length;i+=3){
+        const x = arr[i], z = arr[i+2];
+        const dx = x - cx, dz = z - cz;
+        const d = Math.sqrt(dx*dx + dz*dz);
+        if(d < radius){
+          const falloff = 1 - (d / radius);
+          arr[i+1] += -depth * falloff * falloff;
+        }
+      }
+      break;
+    }
+    case 'reverse': {
+      // pinch fold: invert y of one half
+      const ang = rec.params.angle * t;
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      for(let i=0;i<arr.length;i+=3){
+        const x = arr[i], y = arr[i+1];
+        if(x > 0){
+          const nx = ca*x - sa*y;
+          const ny = sa*x + ca*y;
+          arr[i] = nx; arr[i+1] = ny;
+        }
+      }
+      break;
+    }
+    case 'petal': {
+      // rotate a quadrant region up
+      const q = rec.params.quadrant;
+      const ang = rec.params.angle * t;
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      const signX = (q===0||q===3) ? +1 : -1;
+      const signZ = (q===0||q===1) ? +1 : -1;
+      for(let i=0;i<arr.length;i+=3){
+        const x = arr[i], y = arr[i+1], z = arr[i+2];
+        if(x*signX > 0 && z*signZ > 0){
+          // rotate around diagonal axis (normalised x+z direction)
+          // simpler: rotate around the inner edge of the quadrant
+          // use rotation around z-axis if signZ>0 else x-axis
+          const ny = ca*y - sa*x*signX;
+          const nx = sa*y*signX + ca*x;
+          arr[i] = nx; arr[i+1] = ny;
+        }
+      }
+      break;
+    }
+    case 'waterbomb': {
+      // scale toward centroid + push up
+      const f = 1 - (1 - rec.params.factor) * t;
+      const lift = rec.params.lift * t;
+      for(let i=0;i<arr.length;i+=3){
+        arr[i]   *= f;
+        arr[i+2] *= f;
+        const dx = arr[i], dz = arr[i+2];
+        const d = Math.sqrt(dx*dx+dz*dz);
+        const falloff = Math.max(0, 1 - d / (SIZE*0.6));
+        arr[i+1] += lift * falloff;
+      }
+      break;
+    }
+  }
+}
+
+// build the record that corresponds to a glyph
+function recordFor(glyph, ctx){
+  // ctx: { stepIndex, kappa, lastRecord }
+  let angle = THETA_DEFAULT;
+  // audio modulation
+  angle = audioModulatedAngle(angle, ctx.kappa);
+  switch(glyph){
+    case '●':
+      return { kind:'ground', params:{} };
+    case '〜': {
+      // valley fold: alternate axis based on step parity
+      const ax = (ctx.stepIndex % 2 === 0) ? 'x' : 'z';
+      return { kind:'axis', params:{ axis:ax, side:-1, angle:-angle*0.5 } };
+    }
+    case '┃': {
+      const ax = (ctx.stepIndex % 2 === 0) ? 'z' : 'x';
+      return { kind:'axis', params:{ axis:ax, side:+1, angle:+angle*0.5 } };
+    }
+    case '♡': {
+      // sink: push a region inward
+      const ang = angle;
+      // pick a sink point — alternate corners
+      const positions = [[0,0],[0.35,0.35],[-0.35,0.35],[0.35,-0.35],[-0.35,-0.35]];
+      const p = positions[ctx.stepIndex % positions.length];
+      return { kind:'sink', params:{ cx:p[0], cz:p[1], depth:0.55, radius:0.65 } };
+    }
+    case '△':
+      // reverse: pinch fold
+      return { kind:'reverse', params:{ angle: angle*0.4 } };
+    case '◐':
+      return { kind:'petal', params:{ quadrant: ctx.stepIndex % 4, angle: angle*0.6 } };
+    case '◯':
+      return { kind:'waterbomb', params:{ factor: 0.78, lift: 0.18 } };
+    default:
+      return null;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// animation loop · also drives in-progress fold animations
+// ════════════════════════════════════════════════════════════════
+const animQueue = [];  // [{record, t, dur, start, baseSnapshot}]
+let lastTs = performance.now();
+
+function tick(ts){
+  const dt = ts - lastTs; lastTs = ts;
+  // advance fold animations
+  if(animQueue.length){
+    const cur = animQueue[0];
+    cur.t = Math.min(1, (ts - cur.start) / cur.dur);
+    // restore mesh to "before this anim" snapshot, then apply at progress
+    const arr = paperGeo.attributes.position.array;
+    for(let i=0;i<arr.length;i++) arr[i] = cur.baseSnapshot[i];
+    applyRecordToBuffer(arr, cur.record, easeInOut(cur.t));
+    paperGeo.attributes.position.needsUpdate = true;
+    paperGeo.computeVertexNormals();
+    if(cur.t >= 1){
+      // finalize: re-do wireframe
+      wire.geometry.dispose();
+      wire.geometry = new THREE.WireframeGeometry(paperGeo);
+      animQueue.shift();
+      if(cur.onDone) cur.onDone();
+    }
+  }
+  controls.update();
+  // gentle paper drift when idle
+  if(!animQueue.length && !state.applying){
+    paperMesh.rotation.y += 0.0008 * (dt/16);
+    wire.rotation.y = paperMesh.rotation.y;
+  } else {
+    wire.rotation.y = paperMesh.rotation.y;
+  }
+  // audio sample
+  if(state.audio) sampleAudio();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+function easeInOut(t){ return t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
+requestAnimationFrame(tick);
+
+function resize(){
+  const r = canvasWrap.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / r.height;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ════════════════════════════════════════════════════════════════
+// apply a glyph (animated)
+// ════════════════════════════════════════════════════════════════
+function animateRecord(rec, dur=400){
+  return new Promise(resolve => {
+    const snap = paperGeo.attributes.position.array.slice();
+    animQueue.push({ record:rec, t:0, dur, start:performance.now(), baseSnapshot:snap, onDone:resolve });
+  });
+}
+
+async function applySequence(seq){
+  if(state.applying) return;
+  if(!seq) return;
+  state.applying = true;
+
+  // check for the shield: sequence resolves to zero base folds
+  const baseCount = Array.from(seq).filter(c => GLYPHS.includes(c)).length;
+  const mutCount  = Array.from(seq).filter(c => MUTATIONS.includes(c)).length;
+  if(baseCount === 0 && mutCount > 0){
+    showShield('sequence has no folds', 'mutations without a base · the shield holds');
+    state.applying = false;
+    return;
+  }
+
+  // ground-state reset: clear history but keep current base if we're appending
+  // For simplicity: applying a sequence replaces history (matches "Fold" semantics)
+  resetMesh(false);
+
+  // walk glyphs, building both library state AND our visual records
+  const chars = Array.from(seq);
+  let pendingMul = 1, snapNext = false, skipNext = false;
+  let lastBaseRec = null, lastBaseGlyph = null;
+  let lastStateBefore = null;
+  const visualHistory = [];
+
+  for(let i=0; i<chars.length; i++){
+    const g = chars[i];
+    if(MUTATIONS.includes(g)){
+      flashGlyph(g);
+      if(g==='火') pendingMul *= 2;
+      else if(g==='水') pendingMul *= 0.5;
+      else if(g==='空') skipNext = true;
+      else if(g==='雷') snapNext = true;
+      else if(g==='華'){
+        // undo last
+        if(visualHistory.length){
+          visualHistory.pop();
+          state.history.pop();
+          rebuildFrom(state.history);
+          updateHUD();
+          renderScrub();
+          await wait(180);
+        }
+      } else if(g==='響'){
+        // re-apply last base immediately
+        if(lastBaseGlyph){
+          const rec = recordFor(lastBaseGlyph, { stepIndex: state.history.length, kappa: state.kappa });
+          if(rec){
+            // apply with potential modifiers (mul/snap)
+            if(rec.params.angle !== undefined){
+              if(snapNext){ rec.params.angle = Math.sign(rec.params.angle||1) * Math.PI; snapNext=false; }
+              else rec.params.angle *= pendingMul;
+              pendingMul = 1;
+            }
+            state.history.push(rec);
+            visualHistory.push({glyph:'響', echoed:lastBaseGlyph});
+            await animateRecord(rec, 400);
+            updateHUD();
+            renderScrub();
+            await wait(180);
+          }
+        }
+      }
+      continue;
+    }
+    if(skipNext){ skipNext=false; flashGlyph(g, true); continue; }
+    if(!GLYPHS.includes(g)) continue;
+
+    flashGlyph(g);
+    const rec = recordFor(g, { stepIndex: state.history.length, kappa: state.kappa });
+    if(!rec){ continue; }
+
+    // apply pending mutations to angle-bearing records
+    if(rec.params.angle !== undefined){
+      if(snapNext){ rec.params.angle = Math.sign(rec.params.angle||1) * Math.PI; snapNext=false; }
+      else rec.params.angle *= pendingMul;
+    }
+    if(rec.params.depth !== undefined){
+      rec.params.depth *= pendingMul;
+    }
+    pendingMul = 1;
+
+    // special: ground on non-empty state is idempotent (no-op visually)
+    if(g==='●' && state.history.some(r=>r.kind!=='ground')){
+      // idempotent — no visual change
+    } else {
+      state.history.push(rec);
+      lastBaseRec = rec; lastBaseGlyph = g;
+      visualHistory.push({glyph:g});
+      await animateRecord(rec, 400);
+    }
+    updateHUD();
+    renderScrub();
+    if(i < chars.length-1) await wait(280);
+  }
+
+  // also drive the library to get state vector + foldNumber for HUD
+  const libResult = apply(seq, {});
+  state.S = libResult.state;
+  updateHUD();
+  renderScrub();
+  state.applying = false;
+}
+
+function wait(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function resetMesh(updateUI=true){
+  animQueue.length = 0;
+  state.history = [];
+  state.S = konomigami.emptyState();
+  const arr = paperGeo.attributes.position.array;
+  for(let i=0;i<arr.length;i++) arr[i] = basePositions[i];
+  paperGeo.attributes.position.needsUpdate = true;
+  paperGeo.computeVertexNormals();
+  wire.geometry.dispose();
+  wire.geometry = new THREE.WireframeGeometry(paperGeo);
+  paperMesh.rotation.set(0,0,0);
+  wire.rotation.set(0,0,0);
+  if(updateUI){ updateHUD(); renderScrub(); }
+}
+
+// ════════════════════════════════════════════════════════════════
+// HUD updates
+// ════════════════════════════════════════════════════════════════
+function updateHUD(){
+  const S = state.S;
+  const F = foldNumber(S);
+  document.getElementById('hS').textContent = '['+S.join(',')+']';
+  document.getElementById('hFnum').textContent = F.toLocaleString();
+  document.getElementById('hF').textContent = F > 1e6 ? F.toExponential(2) : F.toLocaleString();
+  document.getElementById('hFac').textContent = factorise(F);
+  document.getElementById('hHist').textContent = state.history.length + ' steps';
+  // phi-coherence from history angles
+  const angles = state.history.map(r => r.params && r.params.angle).filter(a => typeof a === 'number');
+  const phi = phiCoherence(angles);
+  document.getElementById('hPhi').textContent = phi.toFixed(2);
+  document.getElementById('hPhi2').textContent = phi.toFixed(3);
+  document.getElementById('hKap').textContent = state.kappa.toFixed(2);
+  document.getElementById('hKap2').textContent = state.kappa.toFixed(3);
+  document.getElementById('hKapBar').style.width = Math.min(100, Math.max(0, state.kappa*70)).toFixed(0)+'%';
+}
+
+function factorise(n){
+  if(n<=1) return '1';
+  const parts = [];
+  for(let i=0;i<SPINE.length;i++){
+    let c = 0; let x = n;
+    while(x % SPINE[i] === 0 && x > 1){ c++; x = x / SPINE[i]; }
+    if(c>0){
+      // determine actual count from state vector for precision
+    }
+  }
+  // use state vector directly for accurate factorisation
+  const S = state.S;
+  const segs = [];
+  for(let i=0;i<SPINE.length;i++){
+    if((S[i]||0) > 0){
+      segs.push(S[i] === 1 ? String(SPINE[i]) : `${SPINE[i]}^${S[i]}`);
+    }
+  }
+  if(!segs.length) return '1';
+  return n.toLocaleString() + ' = ' + segs.join('·');
+}
+
+// ════════════════════════════════════════════════════════════════
+// UI: glyph palette buttons
+// ════════════════════════════════════════════════════════════════
+const basePal = document.getElementById('basePal');
+const mutPal = document.getElementById('mutPal');
+
+GLYPHS.forEach((g, i) => {
+  const b = document.createElement('button');
+  b.className = 'gbtn'; b.dataset.glyph = g;
+  b.innerHTML = `<span class="kbd">${i+1}</span><span class="g">${g}</span><span class="nm">${GLYPH_NAMES[i]}</span><span class="pr">p=${SPINE[i]} · ${ISA95[i]}</span>`;
+  b.addEventListener('click', () => appendGlyph(g));
+  basePal.appendChild(b);
+});
+const mutKeys = ['q','w','e','r','t','y'];
+MUTATIONS.forEach((g, i) => {
+  const b = document.createElement('button');
+  b.className = 'gbtn mut'; b.dataset.glyph = g;
+  b.innerHTML = `<span class="kbd">${mutKeys[i]}</span><span class="g">${g}</span><span class="nm">${MUTATION_NAMES[i]}</span>`;
+  b.addEventListener('click', () => appendGlyph(g));
+  mutPal.appendChild(b);
+});
+
+function appendGlyph(g){
+  const inp = document.getElementById('seqInput');
+  inp.value = inp.value + g;
+  inp.focus();
+}
+function flashGlyph(g, skipped=false){
+  const all = document.querySelectorAll('.gbtn');
+  all.forEach(b => { if(b.dataset.glyph === g){ b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'), 280); } });
+}
+
+// ════════════════════════════════════════════════════════════════
+// UI: named forms list
+// ════════════════════════════════════════════════════════════════
+const nf = document.getElementById('namedList');
+Object.entries(NAMED_FORMS).forEach(([name, seq]) => {
+  const b = document.createElement('button');
+  b.className = 'nfbtn';
+  const short = seq.length > 18 ? seq.slice(0,16)+'…' : seq;
+  b.innerHTML = `<span>${name}</span><span class="g">${short || '◊'}</span>`;
+  b.title = seq + (seq ? ` · F=${konomigami.sequenceToNumber(seq).toLocaleString()}` : '');
+  b.addEventListener('click', () => {
+    document.getElementById('seqInput').value = seq;
+    applySequence(seq);
+  });
+  nf.appendChild(b);
+});
+
+// ════════════════════════════════════════════════════════════════
+// UI: sequence input, buttons, number input
+// ════════════════════════════════════════════════════════════════
+document.getElementById('foldBtn').addEventListener('click', () => {
+  applySequence(document.getElementById('seqInput').value);
+});
+document.getElementById('seqInput').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); applySequence(e.target.value); }
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  document.getElementById('seqInput').value = '';
+  resetMesh();
+  toast('reset · base plane restored');
+});
+
+document.getElementById('numInput').addEventListener('keydown', (e) => {
+  if(e.key !== 'Enter') return;
+  const n = parseInt(e.target.value, 10);
+  if(!n || n<1) return;
+  if(!isFoldable(n)){
+    showShield(`${n} has no fold`, `irreducible · contains non-spine prime · the shield holds · §18 geometric proof`);
+    document.getElementById('seqInput').value = '';
+    resetMesh();
+    return;
+  }
+  const seq = numberToSequence(n);
+  document.getElementById('seqInput').value = seq;
+  toast(`${n} → ${seq}`);
+  applySequence(seq);
+});
+
+// ════════════════════════════════════════════════════════════════
+// shield notification
+// ════════════════════════════════════════════════════════════════
+function showShield(ti, sub){
+  const sh = document.getElementById('shield');
+  document.getElementById('shieldTi').textContent = '◊ ' + ti;
+  if(sub) sh.querySelector('.sub').textContent = sub;
+  sh.classList.add('show');
+}
+document.getElementById('shieldX').addEventListener('click', () => {
+  document.getElementById('shield').classList.remove('show');
+});
+
+// ════════════════════════════════════════════════════════════════
+// scrubber
+// ════════════════════════════════════════════════════════════════
+function renderScrub(){
+  const scrub = document.getElementById('scrub');
+  scrub.innerHTML = '<span class="lbl">history</span>';
+  const base = document.createElement('span');
+  base.className = 'stp' + (state.history.length === 0 ? ' cur' : '');
+  base.dataset.i = '-1'; base.textContent = '◇'; base.title = 'base plane';
+  base.addEventListener('click', () => scrubTo(-1));
+  scrub.appendChild(base);
+  state.history.forEach((r, i) => {
+    const s = document.createElement('span');
+    s.className = 'stp' + (i === state.history.length-1 ? ' cur' : '');
+    s.dataset.i = i;
+    s.textContent = glyphForRecord(r);
+    s.title = `step ${i+1} · ${r.kind}`;
+    s.addEventListener('click', () => scrubTo(i));
+    scrub.appendChild(s);
+  });
+  scrub.scrollLeft = scrub.scrollWidth;
+}
+function glyphForRecord(r){
+  return { ground:'●', axis:(r.params.angle<0?'〜':'┃'), sink:'♡', reverse:'△', petal:'◐', waterbomb:'◯' }[r.kind] || '·';
+}
+function scrubTo(i){
+  // rewind: apply records [0..i]
+  const trimmed = state.history.slice(0, i+1);
+  const arr = paperGeo.attributes.position.array;
+  for(let k=0;k<arr.length;k++) arr[k] = basePositions[k];
+  for(const r of trimmed) applyRecordToBuffer(arr, r, 1.0);
+  paperGeo.attributes.position.needsUpdate = true;
+  paperGeo.computeVertexNormals();
+  wire.geometry.dispose();
+  wire.geometry = new THREE.WireframeGeometry(paperGeo);
+  document.querySelectorAll('.stp').forEach(s => s.classList.toggle('cur', parseInt(s.dataset.i)===i));
+}
+
+// ════════════════════════════════════════════════════════════════
+// audio reactivity
+// ════════════════════════════════════════════════════════════════
+async function enableMic(){
+  if(state.audio){
+    state.audio.stop();
+    state.audio = null;
+    document.getElementById('micBtn').textContent = '🎤 enable mic';
+    state.kappa = 0.25; updateHUD();
+    return;
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    src.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    state.audio = {
+      analyser, data,
+      stop: () => { try{ stream.getTracks().forEach(t=>t.stop()); ctx.close(); }catch(e){} }
+    };
+    document.getElementById('micBtn').textContent = '🎤 mic on · κ live';
+    toast('mic active · κ from bass/treble');
+  } catch(e){
+    toast('mic permission denied');
+  }
+}
+function sampleAudio(){
+  const a = state.audio; if(!a) return;
+  a.analyser.getByteFrequencyData(a.data);
+  // bass = first 8 bins, high = last 32 bins
+  let bass = 0, high = 0;
+  for(let i=0;i<8;i++) bass += a.data[i];
+  for(let i=a.data.length-32;i<a.data.length;i++) high += a.data[i];
+  bass = (bass / 8) / 255;
+  high = (high / 32) / 255;
+  state.kappa = kappa({ bass, high });
+  document.getElementById('hKap').textContent = state.kappa.toFixed(2);
+  document.getElementById('hKap2').textContent = state.kappa.toFixed(3);
+  document.getElementById('hKapBar').style.width = Math.min(100, Math.max(0, state.kappa*70)).toFixed(0)+'%';
+}
+document.getElementById('micBtn').addEventListener('click', enableMic);
+
+// ════════════════════════════════════════════════════════════════
+// export
+// ════════════════════════════════════════════════════════════════
+function exportGLB(){
+  const exporter = new GLTFExporter();
+  exporter.parse(paperMesh, (result) => {
+    const blob = new Blob([result], { type: 'model/gltf-binary' });
+    download(blob, `konomi-cube-v2-${Date.now()}.glb`);
+    toast('mesh exported · .glb');
+  }, (err) => { toast('export failed'); console.error(err); }, { binary:true });
+}
+function exportJSON(){
+  const payload = {
+    tool: TOOLNAME, version: VERSION, prime: PRIME,
+    sequence: document.getElementById('seqInput').value,
+    state: state.S,
+    foldNumber: foldNumber(state.S),
+    history: state.history,
+    kappa: state.kappa,
+    ts: Date.now(),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  download(blob, `konomi-cube-v2-${Date.now()}.json`);
+  toast('state exported · .json');
+}
+function download(blob, name){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+document.getElementById('expGlb').addEventListener('click', exportGLB);
+document.getElementById('expJson').addEventListener('click', exportJSON);
+
+// ════════════════════════════════════════════════════════════════
+// keyboard shortcuts
+// ════════════════════════════════════════════════════════════════
+const keyMap = { '1':'●','2':'〜','3':'┃','4':'♡','5':'△','6':'◐','7':'◯',
+                 'q':'火','w':'水','e':'空','r':'雷','t':'響','y':'華' };
+window.addEventListener('keydown', (e) => {
+  const tag = document.activeElement && document.activeElement.tagName;
+  const inField = tag==='INPUT' || tag==='TEXTAREA';
+  if(e.key==='Escape'){
+    if(document.getElementById('palette').classList.contains('on')){
+      document.getElementById('palette').classList.remove('on'); return;
+    }
+    if(document.getElementById('setModal').classList.contains('on')){
+      document.getElementById('setModal').classList.remove('on'); return;
+    }
+    document.getElementById('shield').classList.remove('show');
+    document.getElementById('seqInput').value=''; resetMesh(); return;
+  }
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='e'){
+    e.preventDefault(); exportGLB(); return;
+  }
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){
+    e.preventDefault(); openPalette(); return;
+  }
+  if(inField) return;
+  if(e.key === ' '){ e.preventDefault(); applySequence(document.getElementById('seqInput').value); return; }
+  const g = keyMap[e.key.toLowerCase()];
+  if(g){ e.preventDefault(); appendGlyph(g); }
+});
+
+// ════════════════════════════════════════════════════════════════
+// Ω palette · command router
+// ════════════════════════════════════════════════════════════════
+function openPalette(){
+  document.getElementById('palette').classList.add('on');
+  document.getElementById('pInput').value=''; document.getElementById('pInput').focus();
+  renderPaletteBody('');
+}
+document.getElementById('omegaBtn').addEventListener('click', openPalette);
+document.getElementById('palette').addEventListener('click', (e) => {
+  if(e.target.id==='palette') e.currentTarget.classList.remove('on');
+});
+document.getElementById('pInput').addEventListener('input', (e) => renderPaletteBody(e.target.value));
+document.getElementById('pInput').addEventListener('keydown', async (e) => {
+  if(e.key !== 'Enter') return;
+  await runIntent(e.target.value);
+  document.getElementById('palette').classList.remove('on');
+});
+
+const intents = [
+  { match:/^reset|clear/i, do:()=>{ document.getElementById('seqInput').value=''; resetMesh(); toast('reset'); } },
+  { match:/^export\s*glb|^export\b(?!\s*json)/i, do:()=>exportGLB() },
+  { match:/^export\s*json|^save\s*json/i, do:()=>exportJSON() },
+  { match:/^mic|^audio/i, do:()=>enableMic() },
+  { match:/^fold\s+(\d+)/i, do:(m)=>{ const n=parseInt(m[1]); if(isFoldable(n)){ const s=numberToSequence(n); document.getElementById('seqInput').value=s; applySequence(s); } else { showShield(`${n} has no fold`,'irreducible'); } } },
+  { match:/^load\s+(\w+)|^form\s+(\w+)/i, do:(m)=>{ const k=(m[1]||m[2]).toLowerCase(); if(NAMED_FORMS[k]){ document.getElementById('seqInput').value=NAMED_FORMS[k]; applySequence(NAMED_FORMS[k]); } else { toast('unknown form: '+k); } } },
+  { match:/^shield|^127/i, do:()=>showShield('127 has no fold','M₇ · the shield · §18') },
+  { match:/^primorial/i, do:()=>{ const s=NAMED_FORMS.primorial; document.getElementById('seqInput').value=s; applySequence(s); } },
+  { match:/^settings|^keys/i, do:()=>openSettings() },
+];
+
+async function runIntent(q){
+  q = q.trim(); if(!q) return;
+  for(const it of intents){
+    const m = q.match(it.match);
+    if(m){ it.do(m); return; }
+  }
+  // try sequence directly
+  if(Array.from(q).every(c => GLYPHS.includes(c) || MUTATIONS.includes(c))){
+    document.getElementById('seqInput').value = q; applySequence(q); return;
+  }
+  // T3 fallback
+  const tier = await Cascade.detectTier();
+  if(tier !== 'T0'){
+    const r = await Cascade.generate(
+      'You are an intent router for the konomi-cube fold engine. Reply with ONE of: reset | export-glb | export-json | mic | fold N | load NAME | shield. NAME ∈ {primorial,crane,mersenne,fibonacci,shield,unfolded}. N is an integer.',
+      q, 60
+    );
+    const ans = (r.text||'').trim().toLowerCase();
+    if(ans){
+      const m = ans.match(/fold\s+(\d+)/) || ans.match(/load\s+(\w+)/);
+      if(m){ await runIntent(ans); return; }
+      for(const it of intents){ if(ans.match(it.match)){ it.do(ans.match(it.match)); return; } }
+    }
+  }
+  toast('no intent matched · try: fold 42, load crane, reset, export');
+}
+
+function renderPaletteBody(q){
+  const body = document.getElementById('pBody');
+  const items = [
+    ['fold 42', '→ ●〜♡'],
+    ['fold 510510', '→ primorial'],
+    ['fold 127', '→ ◊ the shield'],
+    ['load primorial', '●〜┃♡△◐◯'],
+    ['load crane', '〜┃〜┃♡△◐'],
+    ['load mersenne', '◯⁷'],
+    ['load fibonacci', '〜²┃³♡⁵△⁸◐¹³◯²¹'],
+    ['load shield', '18 × primorial'],
+    ['reset', 'clear sequence'],
+    ['export glb', 'download mesh'],
+    ['export json', 'download state'],
+    ['mic', 'toggle audio reactivity'],
+    ['settings', 'API keys for Ω parser'],
+  ];
+  const filtered = q ? items.filter(([k,v]) => (k+' '+v).toLowerCase().includes(q.toLowerCase())) : items;
+  body.innerHTML = filtered.map(([k,v])=>`<div class="pitem"><b>${k}</b> · ${v}</div>`).join('');
+  body.querySelectorAll('.pitem').forEach((el, i) => el.addEventListener('click', () => {
+    runIntent(filtered[i][0]);
+    document.getElementById('palette').classList.remove('on');
+  }));
+}
+
+// ════════════════════════════════════════════════════════════════
+// settings modal
+// ════════════════════════════════════════════════════════════════
+function openSettings(){
+  const m = document.getElementById('setModal');
+  document.getElementById('setAnth').value = state.settings.anthropicKey||'';
+  document.getElementById('setOAI').value  = state.settings.openaiKey||'';
+  document.getElementById('setGem').value  = state.settings.geminiKey||'';
+  document.getElementById('setOR').value   = state.settings.openrouterKey||'';
+  m.classList.add('on');
+}
+document.getElementById('setBtn').addEventListener('click', openSettings);
+document.getElementById('setCancel').addEventListener('click', () => document.getElementById('setModal').classList.remove('on'));
+document.getElementById('setSave').addEventListener('click', () => {
+  state.settings = {
+    anthropicKey: document.getElementById('setAnth').value.trim(),
+    openaiKey:    document.getElementById('setOAI').value.trim(),
+    geminiKey:    document.getElementById('setGem').value.trim(),
+    openrouterKey:document.getElementById('setOR').value.trim(),
+  };
+  localStorage.setItem('kcv2_settings', JSON.stringify(state.settings));
+  document.getElementById('setModal').classList.remove('on');
+  updateTierBadge();
+  toast('settings saved');
+});
+
+// ════════════════════════════════════════════════════════════════
+// toast
+// ════════════════════════════════════════════════════════════════
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+// ════════════════════════════════════════════════════════════════
+// Cascade · T0/T2/T3 routing (estate snippet)
+// ════════════════════════════════════════════════════════════════
+const Cascade={
+  async detectTier(){if(await this._probe())return'T2';const s=state.settings;if(s.anthropicKey||s.openaiKey||s.geminiKey||s.openrouterKey)return'T3';return'T0'},
+  async _probe(){if(this._p!==undefined)return this._p;try{this._p=await Promise.race([fetch('http://127.0.0.1:11434/api/tags').then(r=>r.ok),new Promise(r=>setTimeout(()=>r(false),350))])}catch(e){this._p=false}return this._p},
+  async generate(sys,user,maxTok){const s=state.settings,max=maxTok||1200;
+    if(s.anthropicKey)try{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':s.anthropicKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:max,system:sys,messages:[{role:'user',content:user}]})});const d=await r.json();return{tier:'T3·Claude',text:d?.content?.[0]?.text||''}}catch(e){}
+    if(s.geminiKey)try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${s.geminiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:[{parts:[{text:user}]}]})});const d=await r.json();return{tier:'T3·Gemini',text:d?.candidates?.[0]?.content?.parts?.[0]?.text||''}}catch(e){}
+    if(s.openaiKey)try{const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.openaiKey},body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'system',content:sys},{role:'user',content:user}]})});const d=await r.json();return{tier:'T3·GPT',text:d?.choices?.[0]?.message?.content||''}}catch(e){}
+    if(s.openrouterKey)try{const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.openrouterKey,'HTTP-Referer':location.origin},body:JSON.stringify({model:'anthropic/claude-haiku-4-5',messages:[{role:'system',content:sys},{role:'user',content:user}]})});const d=await r.json();return{tier:'T3·OpenRouter',text:d?.choices?.[0]?.message?.content||''}}catch(e){}
+    return{tier:'T0',text:null}
+  }
+};
+async function updateTierBadge(){const t=await Cascade.detectTier();const el=document.getElementById('tierBadge');if(el){el.textContent=t==='T0'?'offline':t;el.classList.toggle('t3',t!=='T0')}}
+updateTierBadge();
+
+// ════════════════════════════════════════════════════════════════
+// KONOMI sovereign shim · fallmesh BroadcastChannel · postMessage API
+// ════════════════════════════════════════════════════════════════
+window.KONOMI={active:true,tier:'sovereign',prime:PRIME,check:()=>({ok:true,tier:'sovereign'})};
+try{
+  const sig=new BroadcastChannel('fall-signal');
+  sig.postMessage({source:'konomi-cube-v2',type:'hello',prime:PRIME,version:VERSION,ts:Date.now()});
+  sig.addEventListener('message',e=>{
+    const m=e.data;
+    if(m && m.type==='ping') sig.postMessage({source:'konomi-cube-v2',type:'pong',prime:PRIME});
+    // fold-remote: another tool can drive the cube
+    if(m && m.target==='konomi-cube-v2' && m.action==='fold' && typeof m.sequence==='string'){
+      document.getElementById('seqInput').value = m.sequence;
+      applySequence(m.sequence);
+      sig.postMessage({source:'konomi-cube-v2',type:'folded',prime:PRIME,sequence:m.sequence});
+    }
+  });
+}catch(e){}
+
+window.addEventListener('message',async e=>{
+  const m=e.data; if(!m || m.target!=='konomi-cube-v2' || !m.action) return;
+  let r=null;
+  if(m.action==='ping') r={ok:true,prime:PRIME,version:VERSION};
+  else if(m.action==='fold' && typeof m.sequence==='string'){
+    document.getElementById('seqInput').value = m.sequence;
+    await applySequence(m.sequence);
+    r={ok:true,sequence:m.sequence,state:state.S,foldNumber:foldNumber(state.S)};
+  } else if(m.action==='reset'){ resetMesh(); r={ok:true}; }
+  else if(m.action==='export-glb'){
+    const exporter = new GLTFExporter();
+    r = await new Promise(res => exporter.parse(paperMesh, (g) => res({ok:true, bytes: Array.from(new Uint8Array(g))}), (err) => res({ok:false,error:String(err)}), {binary:true}));
+  } else if(m.action==='get-state'){
+    r={ok:true,sequence:document.getElementById('seqInput').value,state:state.S,foldNumber:foldNumber(state.S),history:state.history.length};
+  }
+  e.source?.postMessage({target:m.source||'*',responseTo:m.action,data:r},'*');
+});
+
+// ════════════════════════════════════════════════════════════════
+// boot
+// ════════════════════════════════════════════════════════════════
+updateHUD();
+renderScrub();
+toast('konomi-cube v2 · the fold engine · prime 691');
+
+</script>
+</body>
+</html>
