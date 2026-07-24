@@ -1,5 +1,7 @@
 # 紙 konomi-cube · v2 · the fold engine
 
+**Live:** [sjgant80-hub.github.io/konomi-cube-v2](https://sjgant80-hub.github.io/konomi-cube-v2/)
+
 > the interactive fold engine · v20.4 socket VI made visible
 >
 > prime **691** · sovereign single HTML · MIT · ◊·κ=1
